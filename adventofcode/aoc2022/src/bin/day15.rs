@@ -1,6 +1,6 @@
 use glam::IVec2;
+use std::collections::HashSet;
 use std::io::{stdin, Read};
-use std::{cmp::*, collections::*, ops::*};
 
 fn main() -> anyhow::Result<()> {
     let mut input = String::new();
@@ -25,22 +25,47 @@ fn main() -> anyhow::Result<()> {
         .collect();
 
     // Part 1
-    let SCAN_ROW: i32 = 2000000;
-    let mut row_occupied: HashSet<i32> = HashSet::new();
-    row_occupied.extend(sensors.iter().flat_map(|&(sensor, _beacon, distance)| {
-        let prox = (sensor.y - SCAN_ROW).abs();
-        if prox <= distance {
-            sensor.x - (distance - prox)..=sensor.x + (distance - prox)
-        } else {
-            1..=0
+    const SCAN_ROW: i32 = 2000000;
+    let min_x = sensors
+        .iter()
+        .map(|&(sensor, _beacon, distance)| sensor.x - distance + (sensor.y - SCAN_ROW).abs())
+        .min()
+        .unwrap();
+    let max_x = sensors
+        .iter()
+        .map(|&(sensor, _beacon, distance)| sensor.x + distance + (sensor.y - SCAN_ROW).abs())
+        .max()
+        .unwrap();
+
+    let mut test = IVec2::new(min_x, SCAN_ROW);
+    let mut occupied = 0;
+    while test.x <= max_x {
+        let mut fail = false;
+        for &(sensor, _beacon, dist) in &sensors {
+            let disp = (sensor - test).abs();
+            if disp.x + disp.y <= dist {
+                // Skip to end of sensor range
+                let new_x = sensor.x + dist - disp.y + 1;
+                occupied += new_x as usize - test.x as usize;
+                test.x = new_x;
+                fail = true;
+                break;
+            }
         }
-    }));
-    for (_sensor, beacon, _distance) in &sensors {
-        if beacon.y == SCAN_ROW {
-            row_occupied.remove(&beacon.x);
+        if !fail {
+            test.x += 1;
         }
     }
-    println!("{}", row_occupied.len());
+    let beacons: HashSet<IVec2> = sensors
+        .iter()
+        .map(|&(_sensor, beacon, _dist)| beacon)
+        .collect();
+    for b in beacons {
+        if b.y == SCAN_ROW {
+            occupied -= 1;
+        }
+    }
+    println!("{}", occupied);
 
     // Part 2
     let mut test = IVec2::ZERO;
