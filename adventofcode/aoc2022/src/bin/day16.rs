@@ -74,6 +74,7 @@ fn main() -> anyhow::Result<()> {
 
     eprintln!("{:#?}", edges);
 
+    // Part 1
     let mut max_score = 0;
     let mut states = vec![State {
         time: 30,
@@ -128,6 +129,62 @@ fn main() -> anyhow::Result<()> {
     }
 
     println!("{}", max_score);
+
+    // Part 2
+    let mut max_score = 0;
+    let mut states = vec![State2 {
+        times: [26, 26],
+        current: ["AA", "AA"],
+        score: 0,
+        left: nodes.values().sum(),
+        open: HashSet::new(),
+    }];
+
+    while let Some(state) = states.pop() {
+        if state.left == 0 || state.time() <= 0 {
+            if state.score > max_score {
+                max_score = state.score;
+                eprintln!(": {}", max_score);
+            }
+            continue;
+        }
+        if state.score + state.time() * state.left <= max_score {
+            //Impossible to beat max score
+            continue;
+        }
+        let mut ranked: Vec<(&str, i64, i64)> = edges[&state.current()]
+            .iter()
+            .map(|(&node, &cost)| {
+                (
+                    node,
+                    cost,
+                    if state.open.contains(&node) {
+                        0
+                    } else {
+                        nodes[&node] * (state.time() - cost)
+                    },
+                )
+            })
+            .collect();
+        ranked.sort_by_key(|&(_, _, score)| score);
+
+        for (next, cost, _) in ranked {
+            let mut neighbor = state.clone();
+            neighbor.times[state.turn()] -= cost;
+            neighbor.current[state.turn()] = next;
+            states.push(neighbor);
+        }
+        if !state.open.contains(&state.current()) {
+            let mut neighbor = state.clone();
+            neighbor.times[state.turn()] -= 1;
+            neighbor.score += nodes[&state.current()] * neighbor.times[state.turn()];
+            neighbor.left -= nodes[&state.current()];
+            neighbor.open.insert(state.current());
+            states.push(neighbor);
+        }
+    }
+
+    println!("{}", max_score);
     Ok(())
 }
 
@@ -138,4 +195,31 @@ struct State<'a> {
     left: i64,
     current: &'a str,
     open: HashSet<&'a str>,
+}
+
+#[derive(Clone)]
+struct State2<'a> {
+    times: [i64; 2],
+    current: [&'a str; 2],
+    score: i64,
+    left: i64,
+    open: HashSet<&'a str>,
+}
+
+impl<'a> State2<'a> {
+    fn turn(&self) -> usize {
+        if self.times[0] >= self.times[1] {
+            0
+        } else {
+            1
+        }
+    }
+
+    fn time(&self) -> i64 {
+        self.times[self.turn()]
+    }
+
+    fn current(&self) -> &'a str {
+        self.current[self.turn()]
+    }
 }
