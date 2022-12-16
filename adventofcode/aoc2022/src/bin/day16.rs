@@ -5,21 +5,21 @@ fn main() -> anyhow::Result<()> {
     let mut input = String::new();
     stdin().read_to_string(&mut input)?;
 
-    let mut nodes: HashMap<&str, u64> = HashMap::new();
+    let mut nodes: HashMap<&str, i64> = HashMap::new();
     let mut vias: Vec<&str> = Vec::new();
     for line in input.lines() {
         let (_, line) = line.split_once("Valve ").unwrap();
         let (valve, line) = line.split_once(" ").unwrap();
         let (_, line) = line.split_once("=").unwrap();
         let (rate, _line) = line.split_once(";").unwrap();
-        let rate: u64 = rate.parse().unwrap();
+        let rate: i64 = rate.parse().unwrap();
         if rate > 0 || valve == "AA" {
             nodes.insert(valve, rate);
         } else {
             vias.push(valve);
         }
     }
-    let mut edges: HashMap<&str, HashMap<&str, u64>> = input
+    let mut edges: HashMap<&str, HashMap<&str, i64>> = input
         .lines()
         .map(|line| {
             let (_, line) = line.split_once("Valve ").unwrap();
@@ -45,9 +45,9 @@ fn main() -> anyhow::Result<()> {
                 }
                 edges.get_mut(&a).unwrap().remove(&via);
                 edges.get_mut(&b).unwrap().remove(&via);
-                let ea = edges.get_mut(&a).unwrap().entry(&b).or_insert(u64::MAX);
+                let ea = edges.get_mut(&a).unwrap().entry(&b).or_insert(i64::MAX);
                 *ea = (*ea).min(ca + cb);
-                let eb = edges.get_mut(&b).unwrap().entry(&a).or_insert(u64::MAX);
+                let eb = edges.get_mut(&b).unwrap().entry(&a).or_insert(i64::MAX);
                 *eb = (*eb).min(ca + cb);
             }
         }
@@ -64,9 +64,9 @@ fn main() -> anyhow::Result<()> {
                 }
                 edges.get_mut(&a).unwrap().remove(&via);
                 edges.get_mut(&b).unwrap().remove(&via);
-                let ea = edges.get_mut(&a).unwrap().entry(&b).or_insert(u64::MAX);
+                let ea = edges.get_mut(&a).unwrap().entry(&b).or_insert(i64::MAX);
                 *ea = (*ea).min(ca + cb);
-                let eb = edges.get_mut(&b).unwrap().entry(&a).or_insert(u64::MAX);
+                let eb = edges.get_mut(&b).unwrap().entry(&a).or_insert(i64::MAX);
                 *eb = (*eb).min(ca + cb);
             }
         }
@@ -84,7 +84,7 @@ fn main() -> anyhow::Result<()> {
     }];
 
     while let Some(state) = states.pop() {
-        if state.left == 0 || state.time == 0 {
+        if state.left == 0 || state.time <= 0 {
             if state.score > max_score {
                 max_score = state.score;
                 eprintln!(": {}", max_score);
@@ -95,9 +95,8 @@ fn main() -> anyhow::Result<()> {
             //Impossible to beat max score
             continue;
         }
-        let mut ranked: Vec<(&str, u64, u64)> = edges[&state.current]
+        let mut ranked: Vec<(&str, i64, i64)> = edges[&state.current]
             .iter()
-            .filter(|&(_, &cost)| cost <= state.time)
             .map(|(&node, &cost)| {
                 (
                     node,
@@ -134,9 +133,9 @@ fn main() -> anyhow::Result<()> {
 
 #[derive(Clone)]
 struct State<'a> {
-    time: u64,
-    score: u64,
-    left: u64,
+    time: i64,
+    score: i64,
+    left: i64,
     current: &'a str,
     open: HashSet<&'a str>,
 }
