@@ -31,6 +31,11 @@ fn main() -> anyhow::Result<()> {
         })
         .collect();
 
+    eprintln!("{:#?}", edges);
+
+    // Simplify graph by collapsing "vias", nodes with useless valves.
+    // Instead, will store the min cost to travel between useful valves,
+    // and jump directly between them, avoiding a lot of states in between.
     for via in vias {
         let via_edges = edges.remove(&via).unwrap();
         for (&a, &ca) in &via_edges {
@@ -66,6 +71,8 @@ fn main() -> anyhow::Result<()> {
             }
         }
     }
+
+    eprintln!("{:#?}", edges);
 
     let mut max_score = 0;
     let mut states = vec![State {
