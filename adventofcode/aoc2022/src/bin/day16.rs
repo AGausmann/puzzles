@@ -135,7 +135,7 @@ fn main() -> anyhow::Result<()> {
             neighbor.score += nodes[&next] * neighbor.time.max(0);
             neighbor.left -= nodes[&next];
             neighbor.current = next;
-            neighbor.open.insert(state.current);
+            neighbor.open.insert(next);
             states.push(neighbor);
         }
     }
@@ -176,7 +176,7 @@ fn main() -> anyhow::Result<()> {
             neighbor.score += nodes[&next] * neighbor.times[state.turn()].max(0);
             neighbor.left -= nodes[&next];
             neighbor.current[state.turn()] = next;
-            neighbor.open.insert(state.current());
+            neighbor.open.insert(next);
             states.push(neighbor);
         }
     }
