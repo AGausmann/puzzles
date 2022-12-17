@@ -150,11 +150,17 @@ fn main() -> anyhow::Result<()> {
         score: 0,
         left: nodes.values().sum(),
         open: HashSet::new(),
+        log: Vec::new(),
     }];
     while let Some(state) = states.pop() {
         if state.left == 0 || state.time() <= 0 {
             if state.score > max_score {
                 max_score = state.score;
+                let mut log = state.log;
+                log.sort_by_key(|v| -v.1);
+                for (entity, time, valve) in log {
+                    eprintln!("{} {} {}", entity, 26 - time, valve);
+                }
                 eprintln!(": {}", max_score);
             }
             continue;
@@ -177,6 +183,9 @@ fn main() -> anyhow::Result<()> {
             neighbor.left -= nodes[&next];
             neighbor.current[state.turn()] = next;
             neighbor.open.insert(next);
+            neighbor
+                .log
+                .push((state.turn(), neighbor.times[state.turn()], next));
             states.push(neighbor);
         }
     }
@@ -201,6 +210,7 @@ struct State2<'a> {
     score: i64,
     left: i64,
     open: HashSet<&'a str>,
+    log: Vec<(usize, i64, &'a str)>,
 }
 
 impl<'a> State2<'a> {
