@@ -1,4 +1,5 @@
-use std::collections::{HashMap, HashSet};
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::io::{stdin, Read};
 
 fn main() -> anyhow::Result<()> {
@@ -74,6 +75,32 @@ fn main() -> anyhow::Result<()> {
 
     eprintln!("{:#?}", edges);
 
+    // Create a full cost matrix with all-pairs shortest paths.
+    // Naive approach: BFS from each node
+    // Also include the cost of turning on the valve after moving there (+1)
+    let mut matrix: HashMap<&str, HashMap<&str, i64>> = HashMap::new();
+    for &node in nodes.keys() {
+        let mut node_costs = HashMap::new();
+        let mut queue = BinaryHeap::new();
+        queue.push((Reverse(0), node));
+        while let Some((Reverse(current_cost), current)) = queue.pop() {
+            if node_costs.contains_key(&current) {
+                continue;
+            }
+            if current != node {
+                node_costs.insert(current, current_cost);
+            }
+            for (&neighbor, &edge_cost) in &edges[&current] {
+                if !node_costs.contains_key(&neighbor) {
+                    queue.push((Reverse(current_cost + edge_cost + 1), neighbor))
+                }
+            }
+        }
+        matrix.insert(node, node_costs);
+    }
+
+    eprintln!("{:#?}", matrix);
+
     // Part 1
     let mut max_score = 0;
     let mut states = vec![State {
@@ -83,7 +110,6 @@ fn main() -> anyhow::Result<()> {
         current: "AA",
         open: HashSet::new(),
     }];
-
     while let Some(state) = states.pop() {
         if state.left == 0 || state.time <= 0 {
             if state.score > max_score {
@@ -96,33 +122,19 @@ fn main() -> anyhow::Result<()> {
             //Impossible to beat max score
             continue;
         }
-        let mut ranked: Vec<(&str, i64, i64)> = edges[&state.current]
+        let mut ranked: Vec<(&str, i64, i64)> = matrix[&state.current]
             .iter()
-            .map(|(&node, &cost)| {
-                (
-                    node,
-                    cost,
-                    if state.open.contains(&node) {
-                        0
-                    } else {
-                        nodes[&node] * (state.time - cost)
-                    },
-                )
-            })
+            .filter(|&(&node, _)| !state.open.contains(&node))
+            .map(|(&node, &cost)| (node, cost, nodes[&node] * (state.time - cost)))
             .collect();
         ranked.sort_by_key(|&(_, _, score)| score);
 
         for (next, cost, _) in ranked {
             let mut neighbor = state.clone();
             neighbor.time -= cost;
+            neighbor.score += nodes[&next] * neighbor.time.max(0);
+            neighbor.left -= nodes[&next];
             neighbor.current = next;
-            states.push(neighbor);
-        }
-        if !state.open.contains(&state.current) {
-            let mut neighbor = state.clone();
-            neighbor.time -= 1;
-            neighbor.score += nodes[&state.current] * neighbor.time;
-            neighbor.left -= nodes[&state.current];
             neighbor.open.insert(state.current);
             states.push(neighbor);
         }
@@ -139,7 +151,6 @@ fn main() -> anyhow::Result<()> {
         left: nodes.values().sum(),
         open: HashSet::new(),
     }];
-
     while let Some(state) = states.pop() {
         if state.left == 0 || state.time() <= 0 {
             if state.score > max_score {
@@ -152,33 +163,19 @@ fn main() -> anyhow::Result<()> {
             //Impossible to beat max score
             continue;
         }
-        let mut ranked: Vec<(&str, i64, i64)> = edges[&state.current()]
+        let mut ranked: Vec<(&str, i64, i64)> = matrix[&state.current()]
             .iter()
-            .map(|(&node, &cost)| {
-                (
-                    node,
-                    cost,
-                    if state.open.contains(&node) {
-                        0
-                    } else {
-                        nodes[&node] * (state.time() - cost)
-                    },
-                )
-            })
+            .filter(|&(&node, _)| !state.open.contains(&node))
+            .map(|(&node, &cost)| (node, cost, nodes[&node] * (state.time() - cost)))
             .collect();
         ranked.sort_by_key(|&(_, _, score)| score);
 
         for (next, cost, _) in ranked {
             let mut neighbor = state.clone();
             neighbor.times[state.turn()] -= cost;
+            neighbor.score += nodes[&next] * neighbor.times[state.turn()].max(0);
+            neighbor.left -= nodes[&next];
             neighbor.current[state.turn()] = next;
-            states.push(neighbor);
-        }
-        if !state.open.contains(&state.current()) {
-            let mut neighbor = state.clone();
-            neighbor.times[state.turn()] -= 1;
-            neighbor.score += nodes[&state.current()] * neighbor.times[state.turn()];
-            neighbor.left -= nodes[&state.current()];
             neighbor.open.insert(state.current());
             states.push(neighbor);
         }
