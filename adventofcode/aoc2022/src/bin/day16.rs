@@ -77,7 +77,6 @@ fn main() -> anyhow::Result<()> {
 
     // Create a full cost matrix with all-pairs shortest paths.
     // Naive approach: BFS from each node
-    // Also include the cost of turning on the valve after moving there (+1)
     let mut matrix: HashMap<&str, HashMap<&str, i64>> = HashMap::new();
     for &node in nodes.keys() {
         let mut node_costs = HashMap::new();
@@ -92,11 +91,17 @@ fn main() -> anyhow::Result<()> {
             }
             for (&neighbor, &edge_cost) in &edges[&current] {
                 if !node_costs.contains_key(&neighbor) {
-                    queue.push((Reverse(current_cost + edge_cost + 1), neighbor))
+                    queue.push((Reverse(current_cost + edge_cost), neighbor))
                 }
             }
         }
         matrix.insert(node, node_costs);
+    }
+    // Also include the cost of turning on each valve after moving there (+1)
+    for node_edges in matrix.values_mut() {
+        for cost in node_edges.values_mut() {
+            *cost += 1;
+        }
     }
 
     eprintln!("{:#?}", matrix);
