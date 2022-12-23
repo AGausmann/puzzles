@@ -55,21 +55,32 @@ fn main() -> anyhow::Result<()> {
         let mut tortoise = Simulation::new(&jets);
         let mut hare = Simulation::new(&jets);
         loop {
-            tortoise.step();
-            hare.step();
-            hare.step();
+            tortoise.step_piece();
+            hare.step_piece();
+            hare.step_piece();
 
-            if tortoise.current_position.y == tortoise.max_y + 4
-                && hare.current_position.y == hare.max_y + 4
-                && tortoise.next_jet == hare.next_jet
-                && tortoise.current_piece == hare.current_piece
-            {
+            if tortoise.next_jet == hare.next_jet && tortoise.current_piece == hare.current_piece {
                 break;
             }
         }
 
-        println!();
-        println!("{} {}", tortoise.max_y + 1, hare.max_y + 1);
+        let count = 1_000_000_000_000;
+        let remaining = count - hare.piece_count;
+        let count_per_cycle = hare.piece_count - tortoise.piece_count;
+        let height_per_cycle = hare.max_y - tortoise.max_y;
+
+        let remaining_cycles = remaining / count_per_cycle;
+        let remaining_pieces = remaining % count_per_cycle;
+
+        for _ in 0..remaining_pieces {
+            hare.step_piece();
+        }
+        let base_height = hare.max_y;
+
+        println!(
+            "{}",
+            base_height as usize + remaining_cycles * (height_per_cycle as usize) + 1
+        );
     }
 
     Ok(())
@@ -124,6 +135,15 @@ impl<'a> Simulation<'a> {
             self.current_piece = (self.current_piece + 1) % PIECES.len();
             self.current_position = IVec2::new(2, self.max_y + 4);
             self.piece_count += 1;
+        }
+    }
+
+    fn step_piece(&mut self) {
+        loop {
+            self.step();
+            if self.current_position.y == self.max_y + 4 {
+                break;
+            }
         }
     }
 }
