@@ -15,7 +15,14 @@ fn main() -> anyhow::Result<()> {
         .collect::<Vec<Blueprint>>();
 
     // Part 1
-    let ans = blueprints.iter().map(Blueprint::quality).sum::<u32>();
+    let ans = blueprints.iter().map(|bp| bp.quality(24)).sum::<u32>();
+    println!("{}", ans);
+
+    // Part 2
+    let ans = blueprints[..3]
+        .iter()
+        .map(|bp| bp.geodes(32))
+        .product::<u32>();
     println!("{}", ans);
 
     Ok(())
@@ -43,11 +50,11 @@ impl Blueprint {
         }
     }
 
-    fn quality(&self) -> u32 {
-        self.id * self.geodes()
+    fn quality(&self, minutes: u32) -> u32 {
+        self.id * self.geodes(minutes)
     }
 
-    fn geodes(&self) -> u32 {
+    fn geodes(&self, minutes: u32) -> u32 {
         let mut max_geodes = 0;
 
         struct NoCompare<T>(T);
@@ -71,16 +78,14 @@ impl Blueprint {
         //let mut queue = BinaryHeap::new();
         //queue.push((0, NoCompare(State::start())));
         let mut queue = Vec::new();
-        queue.push(State::start());
+        queue.push(State::start(minutes));
 
         //while let Some((_, NoCompare(state))) = queue.pop() {
-        eprintln!();
         while let Some(state) = queue.pop() {
             if state.is_terminal() {
                 let score = state.resources[GEODE];
                 if score > max_geodes {
                     max_geodes = score;
-                    eprintln!(": {}", max_geodes);
                 }
                 continue;
             }
@@ -108,9 +113,9 @@ pub struct State {
 }
 
 impl State {
-    fn start() -> Self {
+    fn start(minutes: u32) -> Self {
         Self {
-            minutes: 24,
+            minutes,
             robots: [1, 0, 0, 0].into(),
             resources: [0, 0, 0, 0].into(),
         }
