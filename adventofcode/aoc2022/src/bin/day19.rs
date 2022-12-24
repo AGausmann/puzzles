@@ -104,7 +104,6 @@ pub struct State {
     minutes: u32,
     robots: UVec4,
     resources: UVec4,
-    building_robot: Option<Resource>,
 }
 
 impl State {
@@ -113,7 +112,6 @@ impl State {
             minutes: 24,
             robots: [1, 0, 0, 0].into(),
             resources: [0, 0, 0, 0].into(),
-            building_robot: None,
         }
     }
 
@@ -153,27 +151,27 @@ impl State {
     }
 
     fn perform(&mut self, action: Action, blueprint: &Blueprint) {
-        // One minute passes
-        self.minutes -= 1;
-
-        // New robot is ready.
-        if let Some(resource) = self.building_robot {
-            self.robots[resource] += 1;
-        }
-
         // Spend to start building a robot.
         match action {
-            Action::Wait => {
-                self.building_robot = None;
-            }
+            Action::Wait => {}
             Action::BuildRobot(r) => {
-                self.building_robot = Some(r);
                 self.resources -= blueprint.robot_cost[r].extend(0);
             }
         }
 
         // Collect resources.
         self.resources += self.robots;
+
+        // New robot is ready.
+        match action {
+            Action::Wait => {}
+            Action::BuildRobot(r) => {
+                self.robots[r] += 1;
+            }
+        }
+
+        // One minute has passed.
+        self.minutes -= 1;
     }
 
     fn score(&self) -> u32 {
