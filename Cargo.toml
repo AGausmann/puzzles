@@ -3,3 +3,6 @@ members = [
     "common",
     "adventofcode/aoc2022",
 ]
+
+[profile.release]
+overflow-checks = true
