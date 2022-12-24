@@ -74,6 +74,7 @@ impl Blueprint {
         queue.push(State::start());
 
         //while let Some((_, NoCompare(state))) = queue.pop() {
+        eprintln!();
         while let Some(state) = queue.pop() {
             if state.is_terminal() {
                 let score = state.resources[GEODE];
@@ -121,57 +122,51 @@ impl State {
 
     fn actions(&self, blueprint: &Blueprint) -> impl Iterator<Item = Action> {
         let options = if self.is_terminal() {
-            [None; 5]
+            [None; 4]
         } else {
             [
-                Some(Action::Wait),
-                self.resources
-                    .xyz()
-                    .cmpge(blueprint.robot_cost[ORE])
-                    .all()
-                    .then_some(Action::BuildRobot(ORE)),
-                self.resources
-                    .xyz()
-                    .cmpge(blueprint.robot_cost[CLAY])
-                    .all()
-                    .then_some(Action::BuildRobot(CLAY)),
-                self.resources
-                    .xyz()
-                    .cmpge(blueprint.robot_cost[OBSIDIAN])
-                    .all()
-                    .then_some(Action::BuildRobot(OBSIDIAN)),
-                self.resources
-                    .xyz()
-                    .cmpge(blueprint.robot_cost[GEODE])
-                    .all()
-                    .then_some(Action::BuildRobot(GEODE)),
+                // Ore and clay robots only need ore production,
+                // which is available from the start.
+                Some(Action { next_robot: ORE }),
+                Some(Action { next_robot: CLAY }),
+                // Obsidian needs clay production first.
+                (self.robots[CLAY] > 0).then_some(Action {
+                    next_robot: OBSIDIAN,
+                }),
+                // Geode needs obsidian production first.
+                (self.robots[OBSIDIAN] > 0).then_some(Action { next_robot: GEODE }),
             ]
         };
         options.into_iter().flatten()
     }
 
     fn perform(&mut self, action: Action, blueprint: &Blueprint) {
-        // Spend to start building a robot.
-        match action {
-            Action::Wait => {}
-            Action::BuildRobot(r) => {
-                self.resources -= blueprint.robot_cost[r].extend(0);
+        // Collect resources until we can afford this robot.
+        while self
+            .resources
+            .xyz()
+            .cmplt(blueprint.robot_cost[action.next_robot])
+            .any()
+        {
+            self.resources += self.robots;
+            // One minute has passed.
+            self.minutes -= 1;
+
+            if self.minutes == 0 {
+                // Ran out of time.
+                return;
             }
         }
 
-        // Collect resources.
+        // Spend to start building robot.
+        self.resources -= blueprint.robot_cost[action.next_robot].extend(0);
+
+        // Additional minute to build robot.
         self.resources += self.robots;
+        self.minutes -= 1;
 
         // New robot is ready.
-        match action {
-            Action::Wait => {}
-            Action::BuildRobot(r) => {
-                self.robots[r] += 1;
-            }
-        }
-
-        // One minute has passed.
-        self.minutes -= 1;
+        self.robots[action.next_robot] += 1;
     }
 
     fn score(&self) -> u32 {
@@ -180,12 +175,11 @@ impl State {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum Action {
-    Wait,
-    BuildRobot(Resource),
+pub struct Action {
+    next_robot: Resource,
 }
 
-// More convenient than enum maps
+// Indexes are more convenient than enums in this case.
 pub type Resource = usize;
 const ORE: Resource = 0;
 const CLAY: Resource = 1;
