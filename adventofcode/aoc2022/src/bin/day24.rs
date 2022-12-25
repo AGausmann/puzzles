@@ -1,3 +1,5 @@
+use common::math::lcm;
+use common::search::dijkstra;
 use glam::*;
 use std::cmp::*;
 use std::collections::*;
@@ -113,34 +115,25 @@ impl Basin {
     }
 
     fn bfs(&self, start_time: i32) -> i32 {
-        let mut visited = HashSet::new();
-        let mut queue = BinaryHeap::new();
-        queue.push((Reverse(start_time), self.start.to_array()));
         let time_modulus = lcm(self.width.x, self.width.y);
+        let neighbor_offsets = [IVec2::ZERO, IVec2::X, IVec2::Y, -IVec2::X, -IVec2::Y];
 
-        while let Some((Reverse(time), position)) = queue.pop() {
-            let position = IVec2::from_array(position);
-            if position == self.end {
-                return time;
-            }
-            let position_3d = position.extend(time % time_modulus);
-            if !visited.insert(position_3d) {
-                continue;
-            }
-
-            let neighbor_offsets = [IVec2::ZERO, IVec2::X, IVec2::Y, -IVec2::X, -IVec2::Y];
-            let neighbor_time = time + 1;
-
-            for n in neighbor_offsets {
-                let neighbor = position + n;
-                let neighbor_3d = neighbor.extend(neighbor_time % time_modulus);
-                if !visited.contains(&neighbor_3d) && self.is_vacant(neighbor_3d) {
-                    queue.push((Reverse(neighbor_time), neighbor.to_array()));
+        dijkstra(
+            self.start.extend(start_time),
+            start_time,
+            |state| state.xy() == self.end,
+            |&current_state, cb| {
+                for n in neighbor_offsets {
+                    let neighbor =
+                        (current_state.xy() + n).extend((current_state.z + 1) % time_modulus);
+                    if self.is_vacant(neighbor) {
+                        cb(neighbor, 1);
+                    }
                 }
-            }
-        }
-
-        panic!()
+            },
+        )
+        .unwrap()
+        .1
     }
 }
 
@@ -160,16 +153,4 @@ impl Blizzards {
         );
         self.start.contains(&rem_corrected)
     }
-}
-
-fn gcd(a: i32, b: i32) -> i32 {
-    if a % b == 0 {
-        b
-    } else {
-        gcd(b, a % b)
-    }
-}
-
-fn lcm(a: i32, b: i32) -> i32 {
-    a * b / gcd(a, b)
 }
