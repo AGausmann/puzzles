@@ -2,6 +2,7 @@
 members = [
     "common",
     "adventofcode/aoc2022",
+    "open.kattis",
 ]
 
 [profile.release]
