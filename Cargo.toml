@@ -2,6 +2,7 @@
 members = [
     "common",
     "adventofcode/aoc2022",
+    "adventofcode/aoc2023",
     "open.kattis",
 ]
 
