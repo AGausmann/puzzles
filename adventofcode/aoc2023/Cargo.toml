@@ -9,6 +9,7 @@ edition = "2021"
 common = { path = "../../common" }
 glam = "*"
 anyhow = "1.0"
+prse = "1.0.3"
 
 [lints.rust]
 unused_imports = "allow"
