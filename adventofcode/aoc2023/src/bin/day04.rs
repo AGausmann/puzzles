@@ -8,7 +8,9 @@ use std::ops::*;
 fn main() -> anyhow::Result<()> {
     let mut input = String::new();
     stdin().read_to_string(&mut input)?;
-    input = input.replace("  ", " ").replace("  ", " ");
+    while input.contains("  ") {
+        input = input.replace("  ", " ");
+    }
 
     let cards = input
         .lines()
