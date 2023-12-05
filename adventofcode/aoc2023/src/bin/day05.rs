@@ -1,4 +1,6 @@
 use gcollections::ops::bounded::Bounded as _;
+use gcollections::ops::Contains;
+use gcollections::ops::Intersection;
 use glam::*;
 use interval::interval_set::ToIntervalSet as _;
 use interval::ops::Range as _;
@@ -21,13 +23,13 @@ fn main() -> anyhow::Result<()> {
 
     lines.next();
 
-    let mut maps: Vec<Vec<RangeMap>> = Vec::new();
+    let mut maps: Vec<Vec<IntervalMapper>> = Vec::new();
     while let Some(_header) = lines.next() {
         maps.push(
             lines
                 .by_ref()
                 .take_while(|line| !line.is_empty())
-                .map(|line| RangeMap::from_str(line).unwrap())
+                .map(|line| RangeMap::from_str(line).unwrap().into())
                 .collect(),
         );
     }
@@ -40,7 +42,9 @@ fn main() -> anyhow::Result<()> {
         .iter()
         .map(|&seed| {
             maps.iter().fold(seed, |inp, map| {
-                map.iter().find_map(|range| range.map(inp)).unwrap_or(inp)
+                map.iter()
+                    .find_map(|range| range.map_single(inp))
+                    .unwrap_or(inp)
             })
         })
         .min()
@@ -48,24 +52,27 @@ fn main() -> anyhow::Result<()> {
     println!("{a}");
 
     // Part 2
-    let seed_ranges: Vec<Range> = seeds
+    let seed_ranges: Vec<Interval<u64>> = seeds
         .chunks(2)
-        .map(|v| Range {
-            start: v[0],
-            length: v[1],
+        .map(|v| {
+            Range {
+                start: v[0],
+                length: v[1],
+            }
+            .into()
         })
         .collect();
 
-    let b = maps
-        .iter()
-        .fold(seed_ranges, |inp, map| {
-            inp.iter().flat_map(|range| range.map(map)).collect()
-        })
-        .iter()
-        .map(|range| range.start)
-        .min()
-        .unwrap();
-    println!("{b}");
+    // let b = maps
+    //     .iter()
+    //     .fold(seed_ranges, |inp, map| {
+    //         inp.iter().flat_map(|range| range.map(map)).collect()
+    //     })
+    //     .iter()
+    //     .map(|range| range.start)
+    //     .min()
+    //     .unwrap();
+    // println!("{b}");
 
     Ok(())
 }
@@ -132,4 +139,43 @@ impl Range {
 
         output
     }
+}
+
+impl From<Range> for Interval<u64> {
+    fn from(range: Range) -> Self {
+        Self::new(range.start, range.start + range.length - 1)
+    }
+}
+
+#[derive(Debug)]
+struct IntervalMapper {
+    dest_start: u64,
+    source: Interval<u64>,
+}
+
+impl IntervalMapper {
+    fn map_single(&self, value: u64) -> Option<u64> {
+        if self.source.contains(&value) {
+            Some(self.dest_start + (value - self.source.lower()))
+        } else {
+            None
+        }
+    }
+
+    fn map(&self, interval: &Interval<u64>) -> Interval<u64> {
+        interval.intersection(&self.source) + self.dest_start
+    }
+}
+
+impl From<RangeMap> for IntervalMapper {
+    fn from(value: RangeMap) -> Self {
+        Self {
+            dest_start: value.dest_start,
+            source: Interval::new(value.source_start, value.source_start + value.length - 1),
+        }
+    }
+}
+
+fn multi_map(interval: &IntervalSet<u64>, mappers: &[IntervalMapper]) -> IntervalSet<u64> {
+    todo!()
 }
