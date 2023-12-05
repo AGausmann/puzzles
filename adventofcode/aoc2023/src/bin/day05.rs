@@ -1,6 +1,9 @@
 use gcollections::ops::bounded::Bounded as _;
 use gcollections::ops::Contains;
+use gcollections::ops::Difference;
+use gcollections::ops::Empty;
 use gcollections::ops::Intersection;
+use gcollections::ops::Union;
 use glam::*;
 use interval::interval_set::ToIntervalSet as _;
 use interval::ops::Range as _;
@@ -52,27 +55,25 @@ fn main() -> anyhow::Result<()> {
     println!("{a}");
 
     // Part 2
-    let seed_ranges: Vec<Interval<u64>> = seeds
+    let seed_ranges = seeds
         .chunks(2)
         .map(|v| {
-            Range {
+            let interval = Interval::from(Range {
                 start: v[0],
                 length: v[1],
-            }
-            .into()
+            });
+            (interval.lower(), interval.upper()).to_interval_set()
         })
-        .collect();
+        .fold(IntervalSet::empty(), |a, b| a.union(&b));
 
-    // let b = maps
-    //     .iter()
-    //     .fold(seed_ranges, |inp, map| {
-    //         inp.iter().flat_map(|range| range.map(map)).collect()
-    //     })
-    //     .iter()
-    //     .map(|range| range.start)
-    //     .min()
-    //     .unwrap();
-    // println!("{b}");
+    let b = maps
+        .iter()
+        .fold(seed_ranges, |inp, mappers| {
+            eprintln!("{:?}", inp);
+            multi_map(&inp, mappers)
+        })
+        .lower();
+    println!("{b}");
 
     Ok(())
 }
@@ -85,60 +86,11 @@ struct RangeMap {
     length: u64,
 }
 
-impl RangeMap {
-    fn map(&self, inp: u64) -> Option<u64> {
-        if inp >= self.source_start && inp < self.source_start + self.length {
-            Some(self.dest_start + (inp - self.source_start))
-        } else {
-            None
-        }
-    }
-
-    fn map_range(&self, inp: &Range) -> Option<Range> {
-        if self.source_start < inp.start + inp.length && inp.start < self.source_start + self.length
-        {
-            let inp_start = self.source_start.max(inp.start);
-            let inp_end = (self.source_start + self.length).min(inp.start + inp.length);
-            let inp_length = inp_end - inp_start;
-            if inp_length == 0 {
-                return None;
-            }
-
-            Some(Range {
-                start: self.dest_start + (inp_start - self.source_start),
-                length: inp_length,
-            })
-        } else {
-            None
-        }
-    }
-}
-
 #[derive(Debug, Parse)]
 #[prse = "{start} {length}"]
 struct Range {
     start: u64,
     length: u64,
-}
-
-impl Range {
-    fn map(&self, maps: &[RangeMap]) -> Vec<Range> {
-        let mut output = Vec::new();
-        let mut remaining = (self.start, self.start + self.length - 1).to_interval_set();
-        for map in maps {
-            if let Some(range) = map.map_range(self) {
-                remaining =
-                    remaining - &(range.start, range.start + range.length - 1).to_interval_set();
-                output.push(range);
-            }
-        }
-        output.extend(remaining.iter().map(|interval| Range {
-            start: interval.lower(),
-            length: interval.upper() - interval.lower() + 1,
-        }));
-
-        output
-    }
 }
 
 impl From<Range> for Interval<u64> {
@@ -162,8 +114,11 @@ impl IntervalMapper {
         }
     }
 
-    fn map(&self, interval: &Interval<u64>) -> Interval<u64> {
-        interval.intersection(&self.source) + self.dest_start
+    fn map_set(&self, interval: &IntervalSet<u64>) -> (IntervalSet<u64>, IntervalSet<u64>) {
+        let source =
+            interval.intersection(&(self.source.lower(), self.source.upper()).to_interval_set());
+        let dest = source.clone() - self.source.lower() + self.dest_start;
+        (source, dest)
     }
 }
 
@@ -176,6 +131,20 @@ impl From<RangeMap> for IntervalMapper {
     }
 }
 
-fn multi_map(interval: &IntervalSet<u64>, mappers: &[IntervalMapper]) -> IntervalSet<u64> {
-    todo!()
+fn multi_map(interval_set: &IntervalSet<u64>, mappers: &[IntervalMapper]) -> IntervalSet<u64> {
+    let mut output = IntervalSet::empty();
+    let mut remaining = interval_set.clone();
+    eprintln!("initial {:?}", remaining);
+    for mapper in mappers {
+        let (source, dest) = mapper.map_set(&interval_set);
+        remaining = remaining.difference(&source);
+        output = output.union(&dest);
+        eprintln!("    source {:?}", source);
+        eprintln!("    dest {:?}", dest);
+        eprintln!("    output {:?}", output);
+        eprintln!("    remaining {:?}", remaining);
+        eprintln!();
+    }
+    // Any remaining unmapped intervals are passed through as-is ("identity" transform)
+    output.union(&remaining)
 }
