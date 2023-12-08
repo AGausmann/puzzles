@@ -36,8 +36,6 @@ fn main() -> anyhow::Result<()> {
         .enumerate()
         .map(|(i, player)| player.bid * (i + 1) as u64)
         .sum();
-
-    eprintln!("{:#?}", players);
     println!("{a}");
 
     Ok(())
