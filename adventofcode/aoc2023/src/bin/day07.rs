@@ -189,43 +189,21 @@ impl Hand {
     }
 
     fn from_cards_with_joker(cards: &[Card]) -> Hand {
-        fn rec(cards: &mut [Card]) -> Hand {
-            let position = cards
-                .iter()
-                .enumerate()
-                .find_map(|(i, k)| (*k == Card::Jack).then_some(i));
-
-            match position {
-                None => Hand::from_cards(cards),
-                Some(i) => {
-                    let sub_cards = [
-                        Card::Two,
-                        Card::Three,
-                        Card::Four,
-                        Card::Five,
-                        Card::Six,
-                        Card::Seven,
-                        Card::Eight,
-                        Card::Nine,
-                        Card::Ten,
-                        Card::Queen,
-                        Card::King,
-                        Card::Ace,
-                    ];
-                    let result = sub_cards
-                        .into_iter()
-                        .map(|card| {
-                            cards[i] = card;
-                            rec(cards)
-                        })
-                        .max()
-                        .unwrap();
-                    cards[i] = Card::Jack;
-                    result
-                }
-            }
+        let mut counts = [0; 13];
+        for card in cards {
+            counts[*card as usize] += 1;
         }
-        let mut cards = cards.to_owned();
-        rec(&mut cards)
+        let jokers = std::mem::replace(&mut counts[Card::Jack as usize], 0);
+        counts.sort();
+        *counts.last_mut().unwrap() += jokers;
+        match counts {
+            [.., 5] => Self::Five,
+            [.., 4] => Self::Four,
+            [.., 2, 3] => Self::FullHouse,
+            [.., 3] => Self::Three,
+            [.., 2, 2] => Self::TwoPair,
+            [.., 2] => Self::Pair,
+            _ => Self::High,
+        }
     }
 }
