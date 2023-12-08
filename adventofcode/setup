@@ -1,0 +1,8 @@
+DAY=$(TZ='UTC' date +%d)
+touch input/day$DAY
+touch input/day$DAY.example
+cp -n src/bin/template.rs src/bin/day$DAY.rs
+alias c="cargo c --bin day$DAY"
+alias r="cargo r --release --bin day$DAY"
+alias re="cargo r --release --bin day$DAY <input/day$DAY.example"
+alias ri="cargo r --release --bin day$DAY <input/day$DAY"
