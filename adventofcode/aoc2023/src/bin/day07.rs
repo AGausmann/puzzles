@@ -14,13 +14,12 @@ fn main() -> anyhow::Result<()> {
     let mut input = String::new();
     stdin().read_to_string(&mut input)?;
 
+    // Part 1
     let mut players: Vec<Player> = input
         .lines()
         .map(|s| Player::from_str(s).unwrap())
         .collect();
-
     players.sort();
-
     let a: u64 = players
         .iter()
         .enumerate()
@@ -28,9 +27,23 @@ fn main() -> anyhow::Result<()> {
         .sum();
     println!("{a}");
 
+    // Part 2
+    let mut players: Vec<Player> = players.into_iter().map(Player::into_joker_hand).collect();
+    players.sort_by(Player::cmp_joker);
+
+    let a: u64 = players
+        .iter()
+        .enumerate()
+        .map(|(i, player)| player.bid * (i + 1) as u64)
+        .sum();
+
+    eprintln!("{:#?}", players);
+    println!("{a}");
+
     Ok(())
 }
 
+#[derive(Debug)]
 struct Player {
     hand: Hand,
     cards: Vec<Card>,
@@ -68,6 +81,25 @@ impl Player {
 
     fn key(&self) -> (Hand, &[Card]) {
         (self.hand, &self.cards)
+    }
+
+    fn into_joker_hand(self) -> Self {
+        Self {
+            hand: Hand::from_cards_with_joker(&self.cards),
+            cards: self.cards,
+            bid: self.bid,
+        }
+    }
+
+    fn cmp_joker(&self, rhs: &Self) -> Ordering {
+        self.hand.cmp(&rhs.hand).then_with(|| {
+            self.cards
+                .iter()
+                .zip(&rhs.cards)
+                .map(|(a, b)| Card::cmp_joker(a, b))
+                .find(|ord| *ord != Ordering::Equal)
+                .unwrap_or(Ordering::Equal)
+        })
     }
 }
 
@@ -118,6 +150,15 @@ impl Card {
             _ => panic!(),
         }
     }
+
+    fn cmp_joker(&self, rhs: &Self) -> Ordering {
+        match (self, rhs) {
+            (Self::Jack, Self::Jack) => Ordering::Equal,
+            (Self::Jack, _) => Ordering::Less,
+            (_, Self::Jack) => Ordering::Greater,
+            _ => self.cmp(rhs),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -147,5 +188,46 @@ impl Hand {
             [.., 2] => Self::Pair,
             _ => Self::High,
         }
+    }
+
+    fn from_cards_with_joker(cards: &[Card]) -> Hand {
+        fn rec(cards: &mut [Card]) -> Hand {
+            let position = cards
+                .iter()
+                .enumerate()
+                .find_map(|(i, k)| (*k == Card::Jack).then_some(i));
+
+            match position {
+                None => Hand::from_cards(cards),
+                Some(i) => {
+                    let sub_cards = [
+                        Card::Two,
+                        Card::Three,
+                        Card::Four,
+                        Card::Five,
+                        Card::Six,
+                        Card::Seven,
+                        Card::Eight,
+                        Card::Nine,
+                        Card::Ten,
+                        Card::Queen,
+                        Card::King,
+                        Card::Ace,
+                    ];
+                    let result = sub_cards
+                        .into_iter()
+                        .map(|card| {
+                            cards[i] = card;
+                            rec(cards)
+                        })
+                        .max()
+                        .unwrap();
+                    cards[i] = Card::Jack;
+                    result
+                }
+            }
+        }
+        let mut cards = cards.to_owned();
+        rec(&mut cards)
     }
 }
