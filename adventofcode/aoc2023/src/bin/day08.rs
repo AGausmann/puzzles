@@ -23,7 +23,9 @@ fn main() -> anyhow::Result<()> {
         .collect();
 
     // Part 1
-    println!("{}", solve("AAA", |s| s == "ZZZ", &map, &directions).0);
+    if map.contains_key("AAA") && map.contains_key("ZZZ") {
+        println!("{}", solve("AAA", |s| s == "ZZZ", &map, &directions).0);
+    }
 
     // Part 2
     let p = map
