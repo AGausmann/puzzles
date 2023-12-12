@@ -32,7 +32,7 @@ impl Puzzle {
     fn part_2(&self) -> u64 {
         self.rows
             .iter()
-            .map(|row| row.unfold().arrangements())
+            .map(|row| row.unfold().arrangements_2())
             .sum()
     }
 }
@@ -114,6 +114,56 @@ impl Row {
         valids
     }
 
+    fn arrangements_2(&self) -> u64 {
+        let mut builder = RowBuilder::new(self);
+        let mut valids = 0;
+
+        let unknowns = self.records.iter().filter(|opt| opt.is_none()).count();
+        eprintln!(": {}", unknowns);
+
+        let choices: Vec<[Option<Record>; 3]> = self
+            .records
+            .iter()
+            .map(|rec| {
+                [
+                    *rec,
+                    rec.xor(Some(Record::Operational)),
+                    rec.xor(Some(Record::Damaged)),
+                ]
+            })
+            .collect();
+
+        let mut choice_state: Vec<_> = vec![choices[0].into_iter().flatten()];
+
+        while let Some(choice_iter) = choice_state.last_mut() {
+            match choice_iter.next() {
+                Some(choice) => {
+                    if choice_state.len() == builder.position() {
+                        builder.pop();
+                    }
+                    assert_eq!(choice_state.len(), builder.position() + 1);
+                    if builder.push(choice) {
+                        if builder.position() == choices.len() {
+                            if builder.is_valid() {
+                                valids += 1;
+                            }
+                        } else {
+                            choice_state.push(choices[builder.position()].into_iter().flatten())
+                        }
+                    }
+                }
+                None => {
+                    if choice_state.len() == builder.position() {
+                        builder.pop();
+                    }
+                    assert_eq!(choice_state.len(), builder.position() + 1);
+                    choice_state.pop();
+                }
+            }
+        }
+        valids
+    }
+
     fn unfold(&self) -> Self {
         Self {
             records: self
@@ -149,5 +199,88 @@ impl Record {
             '?' => None,
             _ => panic!("{c}"),
         }
+    }
+}
+
+struct RowBuilder<'a> {
+    clues: &'a [usize],
+    total_operational: usize,
+    total_damaged: usize,
+    records: Vec<(Record, usize, usize)>,
+    operational: usize,
+    damaged: usize,
+    counter: usize,
+    clue: usize,
+}
+
+impl<'a> RowBuilder<'a> {
+    fn new(row: &'a Row) -> Self {
+        let total_damaged: usize = row.clues.iter().sum();
+        let total_operational: usize = row.records.len() - total_damaged;
+        Self {
+            clues: &row.clues,
+            total_operational,
+            total_damaged,
+            records: Vec::new(),
+            operational: 0,
+            damaged: 0,
+            clue: 0,
+            counter: 0,
+        }
+    }
+
+    fn position(&self) -> usize {
+        self.records.len()
+    }
+
+    fn is_valid(&self) -> bool {
+        assert!(self.damaged == self.total_damaged && self.operational == self.total_operational);
+        if self.counter != 0 {
+            self.clue == self.clues.len() - 1 && self.counter == self.clues[self.clue]
+        } else {
+            self.clue == self.clues.len()
+        }
+    }
+
+    fn push(&mut self, record: Record) -> bool {
+        let save_state = (record, self.clue, self.counter);
+        match record {
+            Record::Operational => {
+                if self.operational >= self.total_operational {
+                    return false;
+                }
+                if self.counter != 0 {
+                    if self.counter != self.clues[self.clue] {
+                        return false;
+                    }
+                    self.counter = 0;
+                    self.clue += 1;
+                }
+                self.operational += 1;
+            }
+            Record::Damaged => {
+                if self.damaged >= self.total_damaged {
+                    return false;
+                }
+                if self.clue >= self.clues.len() {
+                    return false;
+                }
+                self.counter += 1;
+                self.damaged += 1;
+            }
+        }
+        self.records.push(save_state);
+        true
+    }
+
+    fn pop(&mut self) -> Option<Record> {
+        let (record, clue, counter) = self.records.pop()?;
+        self.clue = clue;
+        self.counter = counter;
+        match record {
+            Record::Operational => self.operational -= 1,
+            Record::Damaged => self.damaged -= 1,
+        }
+        Some(record)
     }
 }
