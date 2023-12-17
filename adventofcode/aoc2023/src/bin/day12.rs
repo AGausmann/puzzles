@@ -257,6 +257,7 @@ impl<'a> Problem<'a> {
     fn subproblems(&self) -> impl Iterator<Item = Self> + '_ {
         // We need to leave at least [clues - 1] operational records
         // to separate the remaining damaged runs (specified by the clues).
+        // TODO: why do we get overflowing subtractions here?
         let max_operational_run = self
             .total_operational()
             .saturating_sub(self.clues.len().saturating_sub(1));
