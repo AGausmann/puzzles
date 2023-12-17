@@ -26,7 +26,7 @@ impl Puzzle {
     }
 
     fn part_1(&self) -> u64 {
-        self.rows.iter().map(Row::arrangements).sum()
+        self.rows.iter().map(Row::arrangements_2).sum()
     }
 
     fn part_2(&self) -> u64 {
@@ -115,53 +115,11 @@ impl Row {
     }
 
     fn arrangements_2(&self) -> u64 {
-        let mut builder = RowBuilder::new(self);
-        let mut valids = 0;
-
-        let unknowns = self.records.iter().filter(|opt| opt.is_none()).count();
-        eprintln!(": {}", unknowns);
-
-        let choices: Vec<[Option<Record>; 3]> = self
-            .records
-            .iter()
-            .map(|rec| {
-                [
-                    *rec,
-                    rec.xor(Some(Record::Operational)),
-                    rec.xor(Some(Record::Damaged)),
-                ]
-            })
-            .collect();
-
-        let mut choice_state: Vec<_> = vec![choices[0].into_iter().flatten()];
-
-        while let Some(choice_iter) = choice_state.last_mut() {
-            match choice_iter.next() {
-                Some(choice) => {
-                    if choice_state.len() == builder.position() {
-                        builder.pop();
-                    }
-                    assert_eq!(choice_state.len(), builder.position() + 1);
-                    if builder.push(choice) {
-                        if builder.position() == choices.len() {
-                            if builder.is_valid() {
-                                valids += 1;
-                            }
-                        } else {
-                            choice_state.push(choices[builder.position()].into_iter().flatten())
-                        }
-                    }
-                }
-                None => {
-                    if choice_state.len() == builder.position() {
-                        builder.pop();
-                    }
-                    assert_eq!(choice_state.len(), builder.position() + 1);
-                    choice_state.pop();
-                }
-            }
-        }
-        valids
+        let mut memo = Memo::new();
+        memo.solve(Problem {
+            records: &self.records,
+            clues: &self.clues,
+        })
     }
 
     fn unfold(&self) -> Self {
@@ -185,7 +143,7 @@ impl Row {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Record {
     Operational,
     Damaged,
@@ -202,85 +160,116 @@ impl Record {
     }
 }
 
-struct RowBuilder<'a> {
-    clues: &'a [usize],
-    total_operational: usize,
-    total_damaged: usize,
-    records: Vec<(Record, usize, usize)>,
-    operational: usize,
-    damaged: usize,
-    counter: usize,
-    clue: usize,
+struct Memo<'a> {
+    solutions: HashMap<Problem<'a>, u64>,
 }
 
-impl<'a> RowBuilder<'a> {
-    fn new(row: &'a Row) -> Self {
-        let total_damaged: usize = row.clues.iter().sum();
-        let total_operational: usize = row.records.len() - total_damaged;
+impl<'a> Memo<'a> {
+    fn new() -> Self {
         Self {
-            clues: &row.clues,
-            total_operational,
-            total_damaged,
-            records: Vec::new(),
-            operational: 0,
-            damaged: 0,
-            clue: 0,
-            counter: 0,
+            solutions: HashMap::new(),
         }
     }
 
-    fn position(&self) -> usize {
-        self.records.len()
-    }
-
-    fn is_valid(&self) -> bool {
-        assert!(self.damaged == self.total_damaged && self.operational == self.total_operational);
-        if self.counter != 0 {
-            self.clue == self.clues.len() - 1 && self.counter == self.clues[self.clue]
+    fn solve(&mut self, problem: Problem<'a>) -> u64 {
+        if let Some(&solution) = self.solutions.get(&problem) {
+            return solution;
+        }
+        // Calculate subproblems and take the sum of their solutions.
+        let solution = if problem.is_solved() {
+            1
         } else {
-            self.clue == self.clues.len()
-        }
+            problem
+                .subproblems()
+                .map(|subproblem| self.solve(subproblem))
+                .sum()
+        };
+        self.solutions.insert(problem, solution);
+        solution
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct Problem<'a> {
+    records: &'a [Option<Record>],
+    clues: &'a [usize],
+}
+
+impl<'a> Problem<'a> {
+    fn total_damaged(&self) -> usize {
+        self.clues.iter().sum()
     }
 
-    fn push(&mut self, record: Record) -> bool {
-        let save_state = (record, self.clue, self.counter);
-        match record {
-            Record::Operational => {
-                if self.operational >= self.total_operational {
-                    return false;
-                }
-                if self.counter != 0 {
-                    if self.counter != self.clues[self.clue] {
-                        return false;
+    fn total_operational(&self) -> usize {
+        self.records.len() - self.total_damaged()
+    }
+
+    // fn placed_damaged(&self) -> usize {
+    //     self.records
+    //         .iter()
+    //         .filter(|&&rec| rec == Some(Record::Damaged))
+    //         .count()
+    // }
+
+    // fn placed_operational(&self) -> usize {
+    //     self.records
+    //         .iter()
+    //         .filter(|&&rec| rec == Some(Record::Operational))
+    //         .count()
+    // }
+
+    // fn missing_damaged(&self) -> usize {
+    //     self.total_damaged() - self.placed_damaged()
+    // }
+
+    // fn missing_operational(&self) -> usize {
+    //     self.total_operational() - self.placed_operational()
+    // }
+
+    fn is_solved(&self) -> bool {
+        self.clues.is_empty() && self.can_start_with(Record::Operational, self.records.len())
+    }
+
+    fn can_start_with(&self, record: Record, run_length: usize) -> bool {
+        run_length <= self.records.len()
+            && self.records[..run_length]
+                .iter()
+                .all(|rec| rec.is_none() || *rec == Some(record))
+    }
+
+    fn assume_operational(&self, run_length: usize) -> Option<Self> {
+        self.can_start_with(Record::Operational, run_length)
+            .then_some(Self {
+                records: &self.records[run_length..],
+                clues: self.clues,
+            })
+    }
+
+    fn assume_damaged(&self) -> Option<Self> {
+        let run_length = *self.clues.get(0)?;
+        self.can_start_with(Record::Damaged, run_length)
+            .then_some(Self {
+                records: &self.records[run_length..],
+                clues: &self.clues[1..],
+            })
+    }
+
+    fn subproblems(&self) -> impl Iterator<Item = Self> + '_ {
+        // We need to leave at least [clues - 1] operational records
+        // to separate the remaining damaged runs (specified by the clues).
+        let max_operational_run = self
+            .total_operational()
+            .saturating_sub(self.clues.len().saturating_sub(1));
+        (0..=max_operational_run).flat_map(move |operational_len| {
+            self.assume_operational(operational_len)
+                .and_then(|pre_damaged| pre_damaged.assume_damaged())
+                .and_then(|post_damaged| {
+                    if post_damaged.is_solved() {
+                        Some(post_damaged)
+                    } else {
+                        post_damaged.assume_operational(1)
                     }
-                    self.counter = 0;
-                    self.clue += 1;
-                }
-                self.operational += 1;
-            }
-            Record::Damaged => {
-                if self.damaged >= self.total_damaged {
-                    return false;
-                }
-                if self.clue >= self.clues.len() {
-                    return false;
-                }
-                self.counter += 1;
-                self.damaged += 1;
-            }
-        }
-        self.records.push(save_state);
-        true
-    }
-
-    fn pop(&mut self) -> Option<Record> {
-        let (record, clue, counter) = self.records.pop()?;
-        self.clue = clue;
-        self.counter = counter;
-        match record {
-            Record::Operational => self.operational -= 1,
-            Record::Damaged => self.damaged -= 1,
-        }
-        Some(record)
+                })
+        })
     }
 }
