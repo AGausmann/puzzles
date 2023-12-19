@@ -9,7 +9,7 @@ edition = "2021"
 common = { path = "../../common" }
 glam = "*"
 anyhow = "1.0"
-prse = "1.0.3"
+prse = "1.1.1"
 intervallum = "1.4.0"
 gcollections = "1.5.0"
 

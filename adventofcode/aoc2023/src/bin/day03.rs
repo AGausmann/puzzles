@@ -1,3 +1,4 @@
+use common::grid::Grid;
 use glam::*;
 use std::cmp::*;
 use std::collections::*;
@@ -8,15 +9,18 @@ fn main() -> anyhow::Result<()> {
     let mut input = String::new();
     stdin().read_to_string(&mut input)?;
 
-    let grid: Vec<Vec<char>> = input.lines().map(|s| s.chars().collect()).collect();
+    let grid = Grid::from_chars(&input);
     // Part A
     let mut sum = 0;
-    let mut gears: HashMap<(usize, usize), Vec<u32>> = HashMap::new();
-    for (i_row, row) in grid.iter().enumerate() {
+    let mut gears: HashMap<IVec2, Vec<u32>> = HashMap::new();
+    for y in 0..grid.height() {
         let mut acc = 0;
         let mut adjacent = false;
         let mut local_gears = HashSet::new();
-        for (i_col, cell) in row.iter().enumerate() {
+        for x in 0..grid.width() {
+            let v = ivec2(x as _, y as _);
+            let cell = grid.get(v).unwrap();
+
             if !cell.is_ascii_digit() {
                 if adjacent {
                     sum += acc;
@@ -32,57 +36,14 @@ fn main() -> anyhow::Result<()> {
 
             acc = 10 * acc + cell.to_digit(10).unwrap();
 
-            let neighbors = [
-                if i_row > 0 {
-                    Some((i_row - 1, i_col))
-                } else {
-                    None
-                },
-                if i_row < grid.len() - 1 {
-                    Some((i_row + 1, i_col))
-                } else {
-                    None
-                },
-                if i_col > 0 {
-                    Some((i_row, i_col - 1))
-                } else {
-                    None
-                },
-                if i_col < row.len() - 1 {
-                    Some((i_row, i_col + 1))
-                } else {
-                    None
-                },
-                if i_row > 0 && i_col > 0 {
-                    Some((i_row - 1, i_col - 1))
-                } else {
-                    None
-                },
-                if i_row > 0 && i_col < row.len() - 1 {
-                    Some((i_row - 1, i_col + 1))
-                } else {
-                    None
-                },
-                if i_row < grid.len() - 1 && i_col > 0 {
-                    Some((i_row + 1, i_col - 1))
-                } else {
-                    None
-                },
-                if i_row < grid.len() - 1 && i_col < row.len() - 1 {
-                    Some((i_row + 1, i_col + 1))
-                } else {
-                    None
-                },
-            ];
-
-            for (n_row, n_col) in neighbors.into_iter().flatten() {
-                let neighbor = grid[n_row][n_col];
+            for n_v in grid.neighbors_8(v) {
+                let neighbor = *grid.get(n_v).unwrap();
                 if is_symbol(neighbor) {
                     adjacent = true;
                 }
 
                 if neighbor == '*' {
-                    local_gears.insert((n_row, n_col));
+                    local_gears.insert(n_v);
                 }
             }
         }
