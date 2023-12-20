@@ -7,4 +7,5 @@ alias c="cargo c --bin day$DAY"
 alias r="cargo r --release --bin day$DAY"
 alias re="cargo r --release --bin day$DAY <input/day$DAY.example"
 alias ri="cargo r --release --bin day$DAY <input/day$DAY"
+code -r src/bin/day$DAY.rs input/day$DAY input/day$DAY.example 2>/dev/null
 echo "Setup for day $DAY"
