@@ -1,4 +1,10 @@
+use gcollections::ops::Cardinality;
+use gcollections::ops::Empty;
+use gcollections::ops::Intersection;
+use gcollections::ops::IsEmpty;
 use glam::*;
+use interval::interval::ToInterval;
+use interval::Interval;
 use prse::Parse;
 use std::cmp::*;
 use std::collections::*;
@@ -54,7 +60,33 @@ impl Puzzle {
     }
 
     fn part_2(&self) -> u64 {
-        0
+        let mut passed: u64 = 0;
+        let mut running: Vec<(PartRange, &str)> = vec![(
+            PartRange {
+                x: (1, 4000).to_interval(),
+                m: (1, 4000).to_interval(),
+                a: (1, 4000).to_interval(),
+                s: (1, 4000).to_interval(),
+            },
+            "in",
+        )];
+        while let Some((range, workflow)) = running.pop() {
+            let mapped = self.workflows[workflow].map(&range);
+            passed += mapped
+                .iter()
+                .flat_map(|(range, action)| (**action == Action::Accept).then(|| range.size()))
+                .sum::<u64>();
+
+            running.extend(mapped.iter().flat_map(|(range, action)| {
+                if let Action::Goto(name) = action {
+                    Some((*range, name.as_str()))
+                } else {
+                    None
+                }
+            }));
+        }
+
+        passed
     }
 }
 
@@ -68,6 +100,27 @@ struct Workflow {
 impl Workflow {
     fn test(&self, part: &Part) -> &Action {
         self.rules.iter().find_map(|rule| rule.test(part)).unwrap()
+    }
+
+    fn map(&self, range: &PartRange) -> Vec<(PartRange, &Action)> {
+        let mut outputs = Vec::new();
+        let mut residual = *range;
+        for rule in &self.rules {
+            if residual.is_empty() {
+                break;
+            }
+
+            let (pass, action, fail) = rule.split(&residual);
+            if !pass.is_empty() {
+                outputs.push((pass, action))
+            }
+            residual = fail;
+        }
+
+        // The last rule must be a direct action (matching the whole residual).
+        assert!(residual.is_empty());
+
+        outputs
     }
 }
 
@@ -86,9 +139,19 @@ impl Rule {
             Self::Direct(action) => Some(action),
         }
     }
+
+    fn split(&self, range: &PartRange) -> (PartRange, &Action, PartRange) {
+        match self {
+            Self::Conditional(condition, action) => {
+                let (pass, fail) = condition.split(range);
+                (pass, action, fail)
+            }
+            Self::Direct(action) => (*range, action, PartRange::empty()),
+        }
+    }
 }
 
-#[derive(Parse)]
+#[derive(Debug, Clone, Copy, Parse)]
 enum Condition {
     #[prse = "{}>{}"]
     Greater(char, u64),
@@ -103,9 +166,26 @@ impl Condition {
             &Self::Less(c, val) => part.get(c) < val,
         }
     }
+
+    fn split(&self, range: &PartRange) -> (PartRange, PartRange) {
+        match self {
+            &Self::Greater(c, val) => (
+                val.checked_add(1)
+                    .map(|v| range.intersect_on(c, (v, u64::MAX).to_interval()))
+                    .unwrap_or(PartRange::empty()),
+                range.intersect_on(c, (u64::MIN, val).to_interval()),
+            ),
+            &Self::Less(c, val) => (
+                val.checked_sub(1)
+                    .map(|v| range.intersect_on(c, (u64::MIN, v).to_interval()))
+                    .unwrap_or(PartRange::empty()),
+                range.intersect_on(c, (val, u64::MAX).to_interval()),
+            ),
+        }
+    }
 }
 
-#[derive(Parse)]
+#[derive(Parse, PartialEq)]
 enum Action {
     #[prse = "R"]
     Reject,
@@ -137,5 +217,69 @@ impl Part {
 
     fn sum(&self) -> u64 {
         self.x + self.m + self.a + self.s
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct PartRange {
+    x: Interval<u64>,
+    m: Interval<u64>,
+    a: Interval<u64>,
+    s: Interval<u64>,
+}
+
+impl PartRange {
+    fn intersect_on(&self, c: char, interval: Interval<u64>) -> Self {
+        match c {
+            'x' => Self {
+                x: self.x.intersection(&interval),
+                ..*self
+            },
+            'm' => Self {
+                m: self.m.intersection(&interval),
+                ..*self
+            },
+            'a' => Self {
+                a: self.a.intersection(&interval),
+                ..*self
+            },
+            's' => Self {
+                s: self.s.intersection(&interval),
+                ..*self
+            },
+            _ => panic!("{c:?}"),
+        }
+    }
+}
+
+impl Empty for PartRange {
+    fn empty() -> Self {
+        Self {
+            x: Empty::empty(),
+            m: Empty::empty(),
+            a: Empty::empty(),
+            s: Empty::empty(),
+        }
+    }
+}
+
+impl Cardinality for PartRange {
+    type Size = u64;
+
+    fn size(&self) -> Self::Size {
+        self.x.size() * self.m.size() * self.a.size() * self.s.size()
+    }
+}
+
+impl Intersection for PartRange {
+    type Output = Self;
+
+    fn intersection(&self, rhs: &Self) -> Self::Output {
+        Self {
+            x: self.x.intersection(&rhs.x),
+            m: self.m.intersection(&rhs.m),
+            a: self.a.intersection(&rhs.a),
+            s: self.s.intersection(&rhs.s),
+        }
     }
 }
