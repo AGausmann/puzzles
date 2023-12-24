@@ -34,7 +34,7 @@ impl Puzzle {
     }
 
     fn part_1(&self) -> u64 {
-        dijkstra::<Crucible, u64>(
+        let result = dijkstra::<Crucible, u64>(
             Crucible {
                 position: IVec2::ZERO,
                 direction: IVec2::X,
@@ -59,13 +59,12 @@ impl Puzzle {
                     }
                 }
             },
-        )
-        .unwrap()
-        .1
+        );
+        result.min_cost[&result.goal.unwrap()]
     }
 
     fn part_2(&self) -> u64 {
-        dijkstra::<UltraCrucible, u64>(
+        let result = dijkstra::<UltraCrucible, u64>(
             UltraCrucible {
                 position: IVec2::ZERO,
                 direction: IVec2::X,
@@ -91,9 +90,8 @@ impl Puzzle {
                     }
                 }
             },
-        )
-        .unwrap()
-        .1
+        );
+        result.min_cost[&result.goal.unwrap()]
     }
 }
 

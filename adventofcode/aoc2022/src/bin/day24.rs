@@ -118,7 +118,7 @@ impl Basin {
         let time_modulus = lcm(self.width.x, self.width.y);
         let neighbor_offsets = [IVec2::ZERO, IVec2::X, IVec2::Y, -IVec2::X, -IVec2::Y];
 
-        dijkstra(
+        let result = dijkstra(
             self.start.extend(start_time),
             start_time,
             |state| state.xy() == self.end,
@@ -131,9 +131,8 @@ impl Basin {
                     }
                 }
             },
-        )
-        .unwrap()
-        .1
+        );
+        result.min_cost[&result.goal.unwrap()]
     }
 }
 

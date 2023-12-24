@@ -21,12 +21,18 @@ impl<T> Ord for NoCompare<T> {
     }
 }
 
+#[non_exhaustive]
+pub struct Dijkstra<State, Cost> {
+    pub min_cost: HashMap<State, Cost>,
+    pub goal: Option<State>,
+}
+
 pub fn dijkstra<State, Cost>(
     initial_state: State,
     initial_cost: Cost,
     mut is_goal: impl FnMut(&State) -> bool,
     mut next_states: impl FnMut(&State, &mut dyn FnMut(State, Cost)),
-) -> Option<(State, Cost)>
+) -> Dijkstra<State, Cost>
 where
     State: Clone + Eq + Hash,
     Cost: Copy + Ord + Add<Output = Cost>,
@@ -35,9 +41,12 @@ where
     let mut queue = BinaryHeap::new();
     queue.push((Reverse(initial_cost), NoCompare(initial_state)));
 
+    let mut goal = None;
+
     while let Some((Reverse(current_cost), NoCompare(current_state))) = queue.pop() {
         if is_goal(&current_state) {
-            return Some((current_state, current_cost));
+            goal = Some(current_state);
+            break;
         }
 
         next_states(&current_state, &mut |next_state, additional_cost| {
@@ -55,5 +64,5 @@ where
         });
     }
 
-    None
+    Dijkstra { min_cost, goal }
 }
