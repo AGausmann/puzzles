@@ -79,6 +79,18 @@ impl<T> Grid<T> {
         self.cell_coordinate(location).map(|i| &mut self.cells[i])
     }
 
+    pub fn find(&self, value: &T) -> Option<IVec2>
+    where
+        T: PartialEq,
+    {
+        (0..self.width()).find_map(|x| {
+            (0..self.height()).find_map(move |y| {
+                let coord = ivec2(x as _, y as _);
+                (self.get(coord).unwrap() == value).then_some(coord)
+            })
+        })
+    }
+
     /// Generate coordinates of the Von Neumann neighborhood of the cell at the
     /// given location.
     ///

@@ -39,6 +39,7 @@ where
 {
     let mut min_cost: HashMap<State, Cost> = HashMap::new();
     let mut queue = BinaryHeap::new();
+    min_cost.insert(initial_state.clone(), initial_cost);
     queue.push((Reverse(initial_cost), NoCompare(initial_state)));
 
     let mut goal = None;
